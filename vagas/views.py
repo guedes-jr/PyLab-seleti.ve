@@ -3,7 +3,7 @@ from django.http import HttpResponse, Http404
 from empresa.models import Vagas
 from django.contrib import messages
 from django.contrib.messages import constants
-from .models import Tarefa
+from .models import Tarefa, Emails
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.core.mail import EmailMultiAlternatives
@@ -35,7 +35,7 @@ def nova_vaga(request):
     vagas.save()
     messages.add_message(request, constants.SUCCESS, 'Vaga criada com sucesso!')
 
-    return redirect(f'/home/empresa/{empresa}')
+    return redirect(f'/empresa/{empresa}')
 
 
   elif request.method == 'GET':
@@ -44,7 +44,10 @@ def nova_vaga(request):
 def vaga(request, id):
   vaga = get_object_or_404(Vagas, id=id)
   tarefas = Tarefa.objects.filter(vaga=vaga).filter(realizada=False)
-  return render(request, 'vaga.html', {'vaga': vaga, 'tarefas': tarefas})
+  emails = Emails.objects.filter(vaga=vaga)
+  return render(request, 'vaga.html', {'vaga': vaga, 
+                                      'tarefas': tarefas,
+                                      'emails': emails})
 
 def nova_tarefa(request, id_vaga):
   titulo = request.POST.get("titulo")
@@ -69,7 +72,7 @@ def realizar_tarefa(request, id):
 
   if not tarefas_list.exists():
     messages.add_message(request, constants.ERROR, 'Realize apenas uma tarefa válida!')
-    return redirect('/home/empresas')
+    return redirect('')
   
   tarefa = tarefas_list.first()
   tarefa.realizada=True
@@ -91,8 +94,22 @@ def envia_email(request, id_vaga):
                                 [vaga.email,])
   email.attach_alternative(html_content, "text/html")
   if email.send():
+    mail = Emails(
+      vaga=vaga,
+      assunto=assunto,
+      corpo=corpo,
+      enviado=True
+    )
+    mail.save()
     messages.add_message(request, constants.SUCCESS, 'E-mail enviado com sucesso!')
     return redirect(f'/vagas/vaga/{id_vaga}')
   else:
+    mail = Emails(
+      vaga=vaga,
+      assunto=assunto,
+      corpo=corpo,
+      enviado=False
+    )
+    mail.save()
     messages.add_message(request, constants.ERROR, 'Não conseguimos enviar o seu email!')
     return redirect(f'/vagas/vaga/{id_vaga}')
